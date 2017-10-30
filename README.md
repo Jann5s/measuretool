@@ -1,6 +1,6 @@
 # measuretool
 
-This is the README accompagning measuretool.m.
+This is the README accompanying measuretool.m.
 measuretool.m is a matlab function that contains a GUI (Graphical User Interface).
 Since it is a matlab function it requires matlab, and due to heavy use of the graphics 
 features introduced with 2014b, this tool requires at least 2014b.
