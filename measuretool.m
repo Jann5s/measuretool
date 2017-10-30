@@ -26,6 +26,72 @@ function varargout = measuretool(varargin)
 %  - Each measurement can be deleted using <Delete> or modified using <Edit>
 %  - Look at the <Status> panel for guidance while using the different tools
 
+% Option Defaults
+% ------------------------------
+PlotColors = [8,2];
+PlotMarkers = [1,2];
+MarkerSize = 14;
+TextBoxAlpha = 0.5;
+ShowAll = false;
+AutoEdit = false;
+ZoomSelect = false;
+ZoomBox = 250;
+Npoints = 200;
+
+% define some colors
+colornames = {'white';'black';'red';'green';'blue';'cyan';'magenta';'yellow';'gray'};
+color.bg = 0.95*[1, 1, 1];
+color.val(1,:) = [1, 1, 1]; %w
+color.val(2,:) = [0, 0, 0]; %k
+color.val(3,:) = [1, 0, 0]; %r
+color.val(4,:) = [0, 1, 0]; %g
+color.val(5,:) = [0, 0, 1]; %b
+color.val(6,:) = [0, 1, 1]; %c
+color.val(7,:) = [1, 0, 1]; %m
+color.val(8,:) = [1, 1, 0]; %y
+color.val(9,:) = [0.5, 0.5, 0.5]; %gray
+
+% mouse pointers
+pointer{1} = 'arrow'; % normal mode
+pointer{2} = 'cross'; % point select mode
+pointer{3} = 'Circle'; % object select mode
+
+% markers
+markers = {'.';'o';'s';'d';'^';'<';'>';'v';'h';'+';'x';'*';'none'};
+
+% linestyle
+LineWidth = [2,1];
+linestyles = {'-';'--'};
+
+if ispc
+    fixwidthfont = 'FixedWidth';
+else
+    fixwidthfont = 'Monospaced';
+end
+
+% define some special characters (using HTML codes)
+um = [char(956),'m']; % micro meter symbol
+deg = char(176);      % degree symbol
+
+% list of possible units (using in text objects)
+unit_lst = {'km','m','cm','mm','um','nm','-','px','deg.','mi.','ft.','in.'};
+% list of possible units (using in text files)
+unit_str = {'km','m','cm','mm', um ,'nm','' ,'px', deg  ,'mi.','ft.','in.'};
+
+% default units
+unit_default = 7;
+unit_val = unit_default;
+
+% default calibration length
+calib_length = 1;
+
+% possible image types
+imagetypes = {'*.png';'*.jpg';'*.jpeg';'*.gif';'*.tif';'*.tiff';'*.bmp'};
+% add all caps versions of  these files
+imagetypes = [imagetypes ; upper(imagetypes)];
+% convert to an array as a string
+imtypstr = sprintf(['%s',repmat(';%s',1,numel(imagetypes)-1)],imagetypes{:});
+
 % Initialize some Globals
 % ------------------------------
 
@@ -48,74 +114,18 @@ click_count = 0;
 click_data = [];
 current_measure_type = 'null';
 
-% globals for dragging points
+% globals for selecting and dragging points (Edit/Delete/Copy)
 drag_moveall = false;
-drag_currentpoint = [];
-drag_index = [];
+currentpoint = [];
+currentpoint_index = [];
 search_points = [];
 copy_obj_in_memory = false;
-
-% list of possible units
-um = [char(956),'m']; % micro meter symbol
-deg = char(176);      % degree symbol
-unit_lst = {'km','m','cm','mm','um','nm','-','px','deg.','mi.','ft.','in.'};
-unit_str = {'km','m','cm','mm', um ,'nm','' ,'px', deg  ,'mi.','ft.','in.'};
-unit_default = 7;
-unit_val = unit_default;
-calib_length = 1;
-
-% possible image types
-imagetypes = {'*.png';'*.jpg';'*.jpeg';'*.gif';'*.tif';'*.tiff';'*.bmp'};
-% add all caps versions of  these files
-imagetypes = [imagetypes ; upper(imagetypes)];
-% convert to an array as a string
-imtypstr = sprintf(['%s',repmat(';%s',1,numel(imagetypes)-1)],imagetypes{:});
-
-% Option Defaults
-% ===========================================================
-PlotColors = [8,2];
-PlotMarkers = [1,2];
-MarkerSize = 14;
-TextBoxAlpha = 0.5;
-ShowAll = false;
-AutoEdit = false;
-ZoomSelect = false;
-ZoomBox = 250;
-Npoints = 200;
 
 % flag to remember zoom state
 zoom_flag = false;
 
-% mouse pointers
-pointer{1} = 'arrow'; % normal mode
-pointer{2} = 'cross'; % point select mode
-pointer{3} = 'Circle'; % object select mode
-
-% markers
-markers = {'.';'o';'s';'d';'^';'<';'>';'v';'h';'+';'x';'*';'none'};
-
-% linestyle
-LineWidth = [2,1];
-linestyles = {'-';'--'};
-
-if ispc
-    fixwidthfont = 'FixedWidth';
-else
-    fixwidthfont = 'Monospaced';
-end
-
-% define some colors
-colornames = {'white';'black';'red';'green';'blue';'cyan';'magenta';'yellow';'gray'};
-color.bg = 0.95*[1, 1, 1];
-color.val(1,:) = [1, 1, 1]; %w
-color.val(2,:) = [0, 0, 0]; %k
-color.val(3,:) = [1, 0, 0]; %r
-color.val(4,:) = [0, 1, 0]; %g
-color.val(5,:) = [0, 0, 1]; %b
-color.val(6,:) = [0, 1, 1]; %c
-color.val(7,:) = [1, 0, 1]; %m
-color.val(8,:) = [1, 1, 0]; %y
-color.val(9,:) = [0.5, 0.5, 0.5]; %gray
+% Determine the GUI window sizes
+% ------------------------------
 
 % get the monitor size and the active monitor
 Hr = groot;
@@ -161,6 +171,9 @@ pos.iw(1,1) = mon(1)+iw_x;
 pos.iw(1,2) = mon(2)+tb_y;
 pos.iw(1,3) = iw_width;
 pos.iw(1,4) = tb_height;
+
+% Create the GUI windows
+% ------------------------------
 
 % The toolbar figure
 Htb = figure('OuterPosition',pos.tb);
@@ -217,11 +230,10 @@ Hf.HandleVisibility = 'Off';
 % drag highligh object
 Hdrag = plot(NaN,NaN,'or',NaN,NaN,'.r','Parent',Ha,'MarkerSize',MarkerSize+4);
 
-
 % Temporary handles for half finished measurements
 % ----------------------------------
-Htmp = [];
-Hh = [];
+Htmp = []; % temp drawing
+Hh = []; % the help window
 
 % Create the GUI panels
 % ----------------------------------
@@ -721,24 +733,25 @@ end
     end
 
     function null_fun(varargin)
-        % do nothing function
+        % do nothing function (used when clicking and no measurement is
+        % active)
     end
 
 % drag ------------------------
     function drag_move(varargin)
-        % place holder to do nothing, with the mouse moving
+        % dragging a point from a to b
         p = get(Ha,'CurrentPoint');
         str = sprintf('%d,%d',round(p(1,1:2)));
         set(Hc,'String',str)
         
-        if isempty(drag_index)
+        if isempty(currentpoint_index)
             return
         end
         
         % move a point
-        i = drag_index(1);
-        j = drag_index(2);
-        I = drag_index(3);
+        i = currentpoint_index(1);
+        j = currentpoint_index(2);
+        I = currentpoint_index(3);
         
         if drag_moveall
             A(i).obj(j).points(:,1) = A(i).obj(j).points(:,1) + (p(1,1)-A(i).obj(j).points(I,1));
@@ -751,7 +764,7 @@ end
     end
 
     function drag_buttondown(varargin)
-        % place holder to do nothing, on mouse click
+        % starting a drag operation
         p = get(Ha,'CurrentPoint');
         
         % mouse click type
@@ -764,14 +777,14 @@ end
             return
         end
         
-        if isempty(drag_currentpoint)
+        if isempty(currentpoint)
             return
         end
         
-        xi = drag_currentpoint(1);
-        yi = drag_currentpoint(2);
-        i = drag_currentpoint(3);
-        j = drag_currentpoint(4);
+        xi = currentpoint(1);
+        yi = currentpoint(2);
+        i = currentpoint(3);
+        j = currentpoint(4);
         x = A(i).obj(j).points(:,1);
         y = A(i).obj(j).points(:,2);
         I = find( abs(x-xi)<1e-6 & abs(y-yi)<1e-6 );
@@ -782,19 +795,19 @@ end
         % not currently dragging
         if strcmp(m_type, 'normal')
             % select a point
-            drag_index = [i,j,I(1)];
+            currentpoint_index = [i,j,I(1)];
             drag_moveall = false;
             set(Hf,'WindowButtonMotionFcn',@drag_move)
         elseif strcmp(m_type, 'alt')
             % select a point
-            drag_index = [i,j,I(1)];
+            currentpoint_index = [i,j,I(1)];
             drag_moveall = true;
             set(Hf,'WindowButtonMotionFcn',@drag_move)
         end
     end
 
     function drag_buttonup(varargin)
-        % drag released
+        % finishing a drag operation
         set(Hf,'WindowButtonMotionFcn',@point_search)
     end
 
@@ -813,12 +826,12 @@ end
             return
         end
         
-        if isempty(drag_currentpoint)
+        if isempty(currentpoint)
             return
         end
         
-        i = drag_currentpoint(3);
-        j = drag_currentpoint(4);
+        i = currentpoint(3);
+        j = currentpoint(4);
         not_j = setdiff(1:numel(A(i).obj),j);
         
         % delete the plot object
@@ -827,7 +840,7 @@ end
         A(i).obj = A(i).obj(not_j);
         
         % the mouse is no longer hovering over a control point
-        drag_currentpoint = [];
+        currentpoint = [];
         set(Hf,'Pointer',pointer{2});
         set(Hdrag,'XData',NaN,'YData',NaN);
         
@@ -866,7 +879,7 @@ end
     end
 
     function copy_buttondown(varargin)
-        % place holder to do nothing, on mouse click
+        % start a copy action, or place a copy object
         p = get(Ha,'CurrentPoint');
         
         % mouse click type
@@ -885,12 +898,12 @@ end
             end
         end
         
-        if isempty(drag_currentpoint)
+        if isempty(currentpoint)
             return
         end
         
-        i = drag_currentpoint(3);
-        j = drag_currentpoint(4);
+        i = currentpoint(3);
+        j = currentpoint(4);
         if isempty(copy_obj_in_memory)
             % copy an object
             delete(Htmp)
@@ -954,11 +967,11 @@ end
             if numel(I) > 1
                 [D, I] = min(D);
             end
-            drag_currentpoint = search_points(I,:);
+            currentpoint = search_points(I,:);
             set(Hdrag,'XData',x(I),'YData',y(I));
         else
             % the mouse is not hovering over a control point
-            drag_currentpoint = [];
+            currentpoint = [];
             set(Hf,'Pointer',pointer{2});
             set(Hdrag,'XData',NaN,'YData',NaN);
         end
@@ -1135,13 +1148,13 @@ end
             set(Htmp(1:4),'XData',x,'YData',y);
             set(Htmp(5),'Position',[x, y, 0],'String','','Rotation',0);
         elseif click_count == 1
-            % one point is done, determining the other
+            % one point is done, determining the next
             x = [click_data(:,1) ; p(1,1)];
             y = [click_data(:,2) ; p(1,2)];
             set(Htmp(1:4),'XData',x,'YData',y);
             set(Htmp(5),'Position',[x(1), y(1), 0],'String','','Rotation',0);
         elseif click_count == 2
-            % one point is done, determining the other
+            % two points are done, determining the last
             x = [click_data(:,1) ; p(1,1)];
             y = [click_data(:,2) ; p(1,2)];
             [x, y, D] = Caliper(x,y);
@@ -1282,9 +1295,6 @@ end
                 yc = y;
                 Ip = [1, 2];
             end
-            if any(isnan(xc))
-                return
-            end
             a = (180/pi)*atan2(diff(yc(Ip)),diff(xc(Ip)));
             a = textangle(a);
             r = sum(hypot(diff(x),diff(y)));
@@ -1347,6 +1357,7 @@ end
             Hs.String = sprintf('%s (%d/%d): select the next point %s',current_measure_type,click_count,Nclicks,str);
         end        
         
+        % Last click is detected, this finalized the measurement
         if (click_count > 0) && (click_count == Nclicks)
             i = currentfig;
             Hs.String = sprintf('%s: measurement done',current_measure_type);
@@ -1368,18 +1379,21 @@ end
             delete(Htmp);
             A(i).obj(j).points = click_data;
             
+            % calibration, there is more to be done
             if strcmpi(current_measure_type,'Calibration')
                 current_measure_type = 'null';
                 % delete older calibration objects (of this image)
                 list = find(arrayfun(@(x) strcmpi(x.type,'Calibration'),A(i).obj(:)));
-                list = setdiff(list,j);
-                notlist = setdiff(1:numel(A(i).obj),list);
-                j = find(notlist==j);
-                
-                % delete the plot object
-                delete([A(i).obj(list).hdl]);
-                % delete the measurement
-                A(i).obj = A(i).obj(notlist);
+                if ~isempty(list)
+                    list = setdiff(list,j);
+                    notlist = setdiff(1:numel(A(i).obj),list);
+                    j = find(notlist==j);
+                    
+                    % delete the plot object
+                    delete([A(i).obj(list).hdl]);
+                    % delete the measurement
+                    A(i).obj = A(i).obj(notlist);
+                end
                 
                 % list of images to apply calibration to
                 list = find(arrayfun(@(x) x.cal==0,A(:)).');
@@ -1424,11 +1438,10 @@ end
         end
         
         obj = A(i).obj(j);
-        if isfield(obj,'type')
-            type = obj.type;
-        else
+        if ~isfield(obj,'type')
             return
         end
+        type = obj.type;
         hdl = obj.hdl;
         
         pixelsize = A(i).pixelsize;
@@ -1519,7 +1532,7 @@ end
                 da = da + 2*pi;
             end
             a2 = a1 + da;
-            A(i).obj(j).val = abs(da) ;
+            A(i).obj(j).val = abs(da);
             r1 = hypot(x(1)-x(2),y(1)-y(2));
             r2 = hypot(x(3)-x(2),y(3)-y(2));
             r = min(r1,r2);
@@ -1571,7 +1584,7 @@ end
     function image_fun(varargin)
         % Buttons in the image panel
         
-        % clear the temporary measurement (if any)
+        % clear some globals
         reset_globals;
         
         type = varargin{3};
@@ -1662,7 +1675,7 @@ end
             return
         end
         
-        % clear the temporary measurement (if any)
+        % clear some globals
         reset_globals;
         
         type = varargin{3};
@@ -1672,9 +1685,10 @@ end
             figure(Hf);
             drawnow
             
-            % block all operation
+            % disable any active measurement
             measure_fun([],[],'null')
             
+            % create a new figure relative to the figure window
             set(Hf,'Units','Pixels');
             gcfpos = get(Hf,'Position');
             set(Hf,'Units','Normalized');
@@ -1691,6 +1705,7 @@ end
             Hcal.Color = color.bg;
             Hcal.MenuBar = 'none';
             Hcal.ToolBar = 'none';
+            Hcal.WindowStyle = 'modal';
             
             % populate the figure with buttons
             x = linspace(0.02,0.98,4);
@@ -1742,7 +1757,7 @@ end
             figure(Hcal);
             drawnow
             
-            % wait for the user to select the length
+            % wait for the user to answer the question
             uiwait(Hcal)
             
             % start drawing the calibration object
@@ -1828,8 +1843,8 @@ end
         % bring figure to the front
         figure(Hf);
         
-        % disable any toolbar buttons
-        UnToggleToolBar
+        % disable any active toolbar buttons
+        UnToggleToolBar;
         
         type = varargin{3};
         if strcmpi(type,'null')
@@ -1936,6 +1951,7 @@ end
             set(Hf,'WindowButtonUpFcn',@null_fun)
             set(Hf,'Pointer',pointer{2});
         end
+        % update the status bar if not Edit,Delete,Copy
         if ismember(current_measure_type,{'Calibration';'Distance';'Caliper';'Circle';'Angle';'Polyline';'Spline'})
             Hs.String = sprintf('%s (%d/%d): select the next point',current_measure_type,click_count,Nclicks);
         end        
@@ -1958,7 +1974,7 @@ end
             save(fullfile(pathname,filename),'-v7.3','mt_data');
             set(Hs,'string',sprintf('%s saved',filename));
         elseif strcmpi(type,'LoadProject')
-            % prompt for a filename to save to
+            % prompt for a filename to read
             [filename,pathname] = uigetfile(fullfile(currentpath,'*.mat'),'Load a project');
             if filename == 0
                 set(Hs,'string','Load project aborted.');
@@ -1976,6 +1992,7 @@ end
             
             set(Hs,'string',sprintf('%s loaded',filename));
         elseif strcmpi(type,'SaveText')
+            % save to a .txt
             if isempty(A) || ~isfield(A,'filename')
                 set(Hs,'string','No images loaded, nothing to be saved');
                 return
@@ -1995,6 +2012,7 @@ end
             fid = fopen(fullfile(pathname,filename),'wt+');
             
             % Write the header
+            % ------------------
             fprintf(fid,'Data file created by measuretool.m \r\n');
             fprintf(fid,'=========================================== \r\n');
             fprintf(fid,'Date:                    %s \r\n',datestr(now));
@@ -2002,6 +2020,9 @@ end
             fprintf(fid,'Number of Measurements:  %d \r\n',sum(Nm));
             fprintf(fid,'= End of Header =========================== \r\n');
             fprintf(fid,'\r\n');
+            
+            % Section 1
+            % ------------------            
             fprintf(fid,'= Measurement Table ======================= \r\n');
             fprintf(fid,'%3s, %3s, %11s, %13s, %5s, %s \r\n','i','j','type','val','unit','filename (i = image number, j = measurement number)');
             fprintf(fid,'------------------------------------------- \r\n');
@@ -2018,6 +2039,9 @@ end
                     fprintf(fid,'%3d, %3d, %11s, %13.6e, %5s, %s \r\n',i,j,type,val,unit,fname);
                 end
             end
+            
+            % Section 2
+            % ------------------            
             fprintf(fid,'=========================================== \r\n');
             fprintf(fid,'\r\n');
             fprintf(fid,'= Additional Data ========================= \r\n');
@@ -2031,14 +2055,12 @@ end
                 fprintf(fid,'Pixelsize          : %13.6e %s/px \r\n',pixelsize(1),unit);
                 fprintf(fid,'Calibration Length : %13.6e %s \r\n',pixelsize(2),unit);
                 fprintf(fid,'Calibration Length : %13.6e %s \r\n',pixelsize(3),'px');
-                
                 if isempty(A(i).obj) || ~isfield(A(i).obj,'points')
                     if i < Nim
                         fprintf(fid,'------------------------------------------- \r\n');
                     end
                     continue
                 end
-                
                 unit = unit_lst{ismember(unit_str,A(i).unit)};
                 for j = 1:Nm(i)
                     type = A(i).obj(j).type;
@@ -2080,6 +2102,7 @@ end
             set(Hs,'string',sprintf('%s written',filename));
             
         elseif strcmpi(type,'SavePNG')
+            % save to png
             if isempty(A) || ~isfield(A,'filename')
                 set(Hs,'string','No images loaded, nothing to be saved');
                 return
@@ -2099,16 +2122,15 @@ end
             set(Hf,'Units','Normalized');
             set(Hf,'PaperUnits','inches','PaperPosition',savepos.*[0 0 1e-2 1e-2])
             
-            
             % save to file
             set([Hc, Ht],'Visible','off');
             print(Hf,fullfile(pathname,filename),'-dpng','-r200')
             set([Hc, Ht],'Visible','on');
             
-            
             % status
             set(Hs,'string',sprintf('%s saved',filename));
         elseif strcmpi(type,'SavePDF')
+            % save to pdf
             if isempty(A) || ~isfield(A,'filename')
                 set(Hs,'string','No images loaded, nothing to be saved');
                 return
@@ -2202,6 +2224,7 @@ end
             end
         end
         
+        % update the list of selection points
         if ShowAll
             selection = 1:numel(A);
         else
@@ -2212,6 +2235,7 @@ end
 
 % ---------------------------------------------
     function options_button(varargin)
+        % toggle the panel
         if strcmpi(Hp(6).Visible,'on')
             % switch options panel off
             set(Hp(6),'Visible','off');
@@ -2228,7 +2252,6 @@ end
 % Helper Functions
 % =====================================================
 
-
 % ---------------------------------------------
     function a = textangle(a)
         % function to rotate text along a line (keeping text mostly upright)
@@ -2243,8 +2266,8 @@ end
     function reset_globals(varargin)
         click_count = 0;
         click_data = [];
-        drag_currentpoint = [];
-        drag_index = [];
+        currentpoint = [];
+        currentpoint_index = [];
         drag_moveall = false;
         zoom_flag = false;
         copy_obj_in_memory = [];
@@ -2252,6 +2275,9 @@ end
 
 % ---------------------------------------------
     function reset_fun(varargin)
+        % this will completely clear the GUI bringing it to the initial
+        % state
+        
         reset_globals;
         current_measure_type = 'null';
         if ishandle(Htmp)
@@ -2628,22 +2654,16 @@ end
 
 % ---------------------------------------------
     function exitGUI(varargin)
-        % is called when the user closes the figure window. It
-        % performs some cleanup of the A structure and then exits the gui
-        
-        if ishandle(Hf)
-            delete(Hf)
-        end
+        % is called when the user closes the figure window.
         if ishandle(Htb)
             delete(Htb)
-        end
-        if ishandle(Hcal)
-            delete(Hcal)
         end
     end
 
 % ---------------------------------------------
     function get_intensities(varargin)
+        % interpolate the images at the x,y locations
+        
         if ~isfield(A,'filename')  || ~isfield(A,'obj')
             return
         end
@@ -2683,6 +2703,8 @@ end
 
 % ---------------------------------------------
     function B = output_fun(varargin)
+        % prepare the data structure for output
+        
         % populate image intensities
         get_intensities;
         
@@ -2691,6 +2713,7 @@ end
         if ~isfield(A,'obj')
             return
         end
+        
         % remove plot handles from the data
         for i = 1:numel(A)
             if ~isempty(A(i).obj)
@@ -2701,6 +2724,7 @@ end
 
 % ---------------------------------------------
     function UnToggleToolBar
+        % disable ui toggle buttons
         zoom(Hf,'off');
         pan(Hf,'off');
         rotate3d(Hf,'off');
@@ -2710,6 +2734,7 @@ end
 
 % ---------------------------------------------
     function filename = basename(filename)
+        % shorthand to get only the filename from a path
         [~,name,ext] = fileparts(filename);
         filename = [name, ext];
     end
@@ -2717,8 +2742,10 @@ end
 % Keyboard Mouse
 % ===========================================================
     function keyPressFcn(varargin)
+        % keyboard presses
         evnt = varargin{2};
         if strcmpi(evnt.Key,'escape')
+            % panic button, reset the gui to some sane state
             measure_fun([],[],'null')
             userxlim = [1 imsize(2)];
             userylim = [1 imsize(1)];
@@ -2763,14 +2790,10 @@ end
         elseif strcmpi(evnt.Key,'control')
             drag_moveall = true;
         end
-        %         str = ['Key: ' evnt.Key];
-        %         for k = 1:numel(evnt.Modifier)
-        %             str = sprintf('%s+%s',evnt.Modifier{k},str);
-        %         end
-        %         disp(str);
     end
 
     function keyReleaseFcn(varargin)
+        % when releasing a key
         evnt = varargin{2};
         if strcmpi(evnt.Key,'control')
             drag_moveall = false;
@@ -2779,15 +2802,16 @@ end
 
 % =====================================================
     function WindowScrollWheelFcn(varargin)
-        evnt = varargin{2};
         % zoom local to the cursor
         p = get(Ha,'CurrentPoint');
         x = p(1,1);
         y = p(1,2);
+
+        evnt = varargin{2};
+        R = 1.02^evnt.VerticalScrollCount;
         
         width = diff(userxlim);
         height = diff(userylim);
-        R = 1.02^evnt.VerticalScrollCount;
         
         a = (x - userxlim(1))./width;
         userxlim(1) = x - a*R*width;
@@ -2801,8 +2825,8 @@ end
 
 % = Help =============================================
     function help_fun(varargin)
-        % this function prints this help to a temporary file and opens the file in
-        % a text editor.
+        % this function creates a new window with the following text inside
+        % if the help is not open, otherwise it closes the help window
         txt = {;
             'This tool (measuretool) is intended for measuring on images.'
             'In order to do this the image needs to have some visual scale to calibrate the pixel to length ratio on, e.g. scale bar, ruler.'
@@ -2985,18 +3009,19 @@ end
 % =====================================================
 
 uiwait(Htb);
+% close calibration window
 if ishandle(Hcal)
     delete(Hcal)
 end
+% close help window
 if ishandle(Hh)
     delete(Hh)
 end
 
-% prepar the outputs
+% prepare the outputs
 if nargout == 1
     varargout{1} = output_fun;
 end
-
 
 % End of main function
 end
