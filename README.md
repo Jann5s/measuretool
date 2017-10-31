@@ -1,6 +1,6 @@
 # Measure Tool
 
-Measure Tool is a matlab function (measuretool.m) that provides a Graphical User Interface (GUI) that is designed the aid measurements on images.
+Measure Tool is a matlab function (measuretool.m) that provides a Graphical User Interface (GUI) that is designed to aid measurements on images.
 
 If an image contains some visible object of known length, for example, a scale bar, or a ruler. Then the physical size of an area as imaged by a pixel (i.e. the pixel size) can be calibrated. This tool provides tools to perform this calibration (draw a line on the ruler) and then perform measurements on the image:
 - Distance: point-point distance
