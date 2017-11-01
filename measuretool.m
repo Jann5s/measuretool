@@ -18,13 +18,48 @@ function varargout = measuretool(varargin)
 % =============================
 %  - Add images to the list using the <Add> button
 %  - Calibrate the image pixelsize using the <Calibrate> button
-%       - This opens a popup which asks for the real length of the object you will calibrate on
+%       - This opens a popup which asks for the real length of the object
+%         you will calibrate on
 %       - Pressing <OK> in the popup will close the popup
-%       - Next, select the start and end point of the calibration object using the mouse
-%       - The calibration can be modified later on if so desired using <Edit>
+%       - Next, select the start and end point of the calibration object
+%         using the mouse
+%       - The calibration can be modified later on using <Edit>
 %  - Use the buttons in the <Measure> panel to start measuring
-%  - Each measurement can be deleted using <Delete> or modified using <Edit>
-%  - Look at the <Status> panel for guidance while using the different tools
+%  - Each measurement can be deleted  or modified using <Delete> or <Edit>
+%  - Look at the <Status> panel for guidance while using the different
+%    tools
+
+
+% General Layout of the code
+% ------------------------------
+% This GUI is build using the concept of sub-functions with shared
+% variables (globals). The main function is the GUI, and all other
+% functions reside inside. A set of variables that define the state of the
+% GUI are used as globals and many functions may write to them,
+% occasionally at the same time. This type of programming may be a bit
+% dangerous, but for the case at hand it works fine. In the rare case of a
+% conflict, the half-finished measuement is just deleted, allowing the new
+% measurement to be created.
+%
+% The code is structured in 4 parts:
+% - Definitions of defaults and initiation of global variables
+% - Creation of the Interface windows ans controls
+% - Sub-functions, in 3 categories
+%      - Functions related to mouse movements and clicks
+%      - Callback functions, i.e. related to control events
+%      - Helper functions,
+% - End of GUI with output processing
+%
+% The figure window has three interactive function handles that are
+% inportant: 
+% - WindowButtonMotionFcn
+% - WindowButtonDownFcn
+% - WindowButtonUpFcn
+% Depending on actions of the user, the handles will point to different
+% functions. Typically, there is one function per measurement type to
+% handle the live drawing of the object. For the measurements mouse clicks
+% are all handles by the addpoints function. However, the Edit/Delete/Copy
+% operations have their own click and release functions.
 
 % Option Defaults
 % ------------------------------
@@ -186,7 +221,6 @@ Htb.MenuBar = 'none';
 Htb.ToolBar = 'none';
 Htb.Tag = 'MT_Toolbar';
 Htb.Units = 'Normalized';
-% Htb.DeleteFcn = @exitGUI;
 Htb.KeyPressFcn = @keyPressFcn;
 Htb.KeyReleaseFcn = @keyReleaseFcn;
 
@@ -258,7 +292,6 @@ Hp(6) = uipanel('Title','Options','Parent',Htb,...
     'Visible','Off');
 
 set(Hp,'BackgroundColor',color.bg,'FontSize',fontsize(1),'Units','normalized');
-
 
 % Create the GUI buttons
 % ----------------------------------
