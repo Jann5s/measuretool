@@ -2168,27 +2168,16 @@ end
                     y = A(i).obj(j).points(:,2);
                     I = A(i).obj(j).intensity;
                     rgb = size(I,2) == 3;
-                    
-                    fprintf(fid,'    x: ');
-                    fprintf(fid,'%10.3e, ',x);
-                    fprintf(fid,'\r\n');
-                    fprintf(fid,'    y: ');
-                    fprintf(fid,'%10.3e, ',y);
-                    fprintf(fid,'\r\n');
                     if rgb
-                        fprintf(fid,'    R: ');
-                        fprintf(fid,'%10.3e, ',I(:,1));
-                        fprintf(fid,'\r\n');
-                        fprintf(fid,'    G: ');
-                        fprintf(fid,'%10.3e, ',I(:,2));
-                        fprintf(fid,'\r\n');
-                        fprintf(fid,'    B: ');
-                        fprintf(fid,'%10.3e, ',I(:,3));
-                        fprintf(fid,'\r\n');
+                        fprintf(fid,'%13s, %13s, %13s, %13s, %13s\r\n','x','y','R','G','B');
+                        for p = 1:numel(x)
+                            fprintf(fid,'%13.6e, %13.6e, %13.6e, %13.6e, %13.6e\r\n',x(p),y(p),I(p,:));
+                        end
                     else
-                        fprintf(fid,'    I: ');
-                        fprintf(fid,'%10.3e, ',I(:,1));
-                        fprintf(fid,'\r\n');
+                        fprintf(fid,'%13s, %13s, %13s\r\n','x','y','I');
+                        for p = 1:numel(x)
+                            fprintf(fid,'%13.6e, %13.6e, %13.6e\r\n',x(p),y(p),I(p,:));
+                        end
                     end
                 end
                 if i < Nim
@@ -2445,7 +2434,7 @@ end
             Hb.imlist.String{i} = basename(filename);
             
             A(i).pixelsize = [];
-            A(i).unit = '';
+            A(i).unit = unit_str(unit_default);
             A(i).cal = 0;
             A(i).obj = [];
         end
@@ -2481,6 +2470,7 @@ end
             end
             if isempty(unit_val)
                 unit_val = unit_default;
+                A(i).unit = unit_str(unit_default);
             end
             if isfield(B,'pixelsize') && ~isempty(B(i).pixelsize)
                 A(i).pixelsize = B(i).pixelsize;
@@ -3020,7 +3010,7 @@ end
             'This panel can be shown by pressing the <Options> button at the top of the GUI, press this button again to go back to the other panels.'
             '<Plot Color>, <Plot Marker> and <Marker Size> control the visual style of the measurements. Each measurement is drawn using two plot curves on top of each other. The bottom one has a slightly wider linewidth. This improves contrast to the measure objects such that they easily are visible, even in images that have high contrast of themselves.'
             '<Font Size> and <Text Box Alpha> control the visual style of the text displayed next to a measurement object. The Text Box Alpha option controls the transparency of the background color. Set it to zero to hide the text box.'
-            '<Number Format> determines how the numbers in the label are formatted, see help sprintf or fprintf for more info. Examples are %.2f for floating point notation, %.4e for scientific notation, or use %g for a more automatic formatting.'
+            '<Number Format> determines how the numbers in the label are formatted, see the matlab formatSpec (e.g. sprintf) for more info. Examples are %.2f for floating point notation, %.4e for scientific notation, or use %g for a more automatic formatting.'
             '<Auto Edit> enable this option to automatically go in <Edit> mode after finalizing each measurement.'
             '<Zoom Select> enable this option for more precision. Now when adding a measurement point, the first mouse click zooms near the point of interest, the second mouse click actually places the point.'
             '<Zoom Box Size> this defines the size (width and hight) of the zoomed area when using Zoom Select.'
