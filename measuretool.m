@@ -8,7 +8,7 @@ function varargout = measuretool(varargin)
 % A = measuretool(A), alternatively preload the tool with a previously
 % generated data structure containing image paths and measurements
 %
-% Version 2.00, 2017, Jan Neggers
+% Version 2.00 (beta), 2017, Jan Neggers
 %
 % This tool is available on the Mathworks FileExchange under the
 % corresponding BSD license.
