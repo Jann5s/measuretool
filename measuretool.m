@@ -180,22 +180,26 @@ end
 
 % determine the fontsize size
 if mon(4) <= 800
-    fontsize = [7,8,14];
+    fontsize = [7,8,16];
+    screenfillfactor = 1;
+elseif mon(4) <= 1024
+    fontsize = [8,9,18];
+    screenfillfactor = 0.95;
 elseif mon(4) <= 1280
-    fontsize = [9,10,18];
-elseif mon(4) <= 1920
     fontsize = [10,12,20];
+    screenfillfactor = 0.85;
 else
     fontsize = [12,14,22];
+    screenfillfactor = 0.75;
 end
 
 % figure positions
-tb_height = 0.85*mon(4);
+tb_height = screenfillfactor*mon(4);
 tb_width = 0.30*tb_height;
-iw_width = min((mon(3)/mon(4))*tb_height,mon(3));
-tb_x = min(0.55*(mon(3)-tb_width-iw_width) + iw_width,mon(3)-tb_width);
-tb_y = max(0.5*(mon(4)-tb_height),1);
+iw_width = screenfillfactor*min((mon(3)/mon(4))*tb_height,(mon(3)-tb_width));
 iw_x = max(0.5*(mon(3)-tb_width-iw_width),1);
+tb_x = min(iw_x+iw_width,mon(3)-tb_width);
+tb_y = max(0.5*(mon(4)-tb_height),1);
 
 % toolbar position
 pos.tb(1,1) = mon(1)+tb_x;
@@ -801,6 +805,79 @@ if nargin == 1
     end
 end
 
+% Keyboard Mouse
+% ===========================================================
+    function keyPressFcn(varargin)
+        % keyboard presses
+        evnt = varargin{2};
+        if strcmpi(evnt.Key,'escape')
+            % panic button, reset the gui to some sane state
+            measure_fun([],[],'null')
+            userxlim = [1 imsize(2)];
+            userylim = [1 imsize(1)];
+            set(Ha,'XLim',userxlim);
+            set(Ha,'YLim',userylim);
+            set(Hs,'String','...');
+            % cancel calibration
+            if ishandle(Hcal)
+                delete(Hcal)
+            end
+        elseif strcmpi(evnt.Key,'space')
+            measure_fun([],[],'Copy')
+        elseif strcmpi(evnt.Key,'d')
+            measure_fun([],[],'Distance')
+        elseif strcmpi(evnt.Key,'p')
+            measure_fun([],[],'Polyline')
+        elseif strcmpi(evnt.Key,'o')
+            measure_fun([],[],'Circle')
+        elseif strcmpi(evnt.Key,'c')
+            measure_fun([],[],'Caliper')
+        elseif strcmpi(evnt.Key,'s')
+            measure_fun([],[],'Spline')
+        elseif strcmpi(evnt.Key,'a')
+            measure_fun([],[],'Angle')
+        elseif strcmpi(evnt.Key,'e')
+            measure_fun([],[],'Edit')
+        elseif strcmpi(evnt.Key,'z')
+            ZoomSelect = ~ZoomSelect;
+            set(Hb.zoomselect,'Value',ZoomSelect);
+            if ZoomSelect
+                Hs.String = 'Zoom Select is activated';
+            else
+                Hs.String = 'Zoom Select is deactivated';
+                if zoom_flag
+                    zoom_flag = false;
+                    set(Ha,'XLim',userxlim,'YLim',userylim);
+                end
+            end
+        elseif strcmpi(evnt.Key,'Delete')
+            measure_fun([],[],'delete')
+        elseif strcmpi(evnt.Key,'backspace')
+            measure_fun([],[],'Delete')
+        elseif strcmpi(evnt.Key,'control')
+            drag_moveall = true;
+        elseif strcmpi(evnt.Key,'downarrow')
+            val = currentfig;
+            Nval = numel(Hb.imlist.String);
+            val = min(val+1,Nval);
+            set(Hb.imlist,'Value',val);
+            image_fun([],[],'select')
+        elseif strcmpi(evnt.Key,'uparrow')
+            val = currentfig;
+            val = max(val-1,1);
+            set(Hb.imlist,'Value',val);
+            image_fun([],[],'select')
+        end
+    end
+
+    function keyReleaseFcn(varargin)
+        % when releasing a key
+        evnt = varargin{2};
+        if strcmpi(evnt.Key,'control')
+            drag_moveall = false;
+        end
+    end
+
 
 % Measurement Controls
 % ===========================================================
@@ -954,8 +1031,6 @@ end
         for k = 1:4
             xp = copy_obj_in_memory.hdl(k).XData;
             yp = copy_obj_in_memory.hdl(k).YData;
-            xp = xp(~isnan(xp));
-            yp = yp(~isnan(yp));
             Htmp(k).XData = xp + ux;
             Htmp(k).YData = yp + uy;
         end
@@ -1010,15 +1085,15 @@ end
             y = y - y(1) + p(1,2);
             
             % store the measurement
-            j = numel(A(i).obj)+1;
-            A(i).obj(j).type = copy_obj_in_memory.type;
+            j = numel(A(currentfig).obj)+1;
+            A(currentfig).obj(j).type = copy_obj_in_memory.type;
             for k = 1:5
-                A(i).obj(j).hdl(k)  = copyobj(Htmp(k),Ha);
+                A(currentfig).obj(j).hdl(k)  = copyobj(Htmp(k),Ha);
             end
-            A(i).obj(j).points = [x(:), y(:)];
+            A(currentfig).obj(j).points = [x(:), y(:)];
             
             copy_obj_in_memory = [];
-            update_measurement(i,j);
+            update_measurement(currentfig,j);
             set(Hf,'WindowButtonMotionFcn',@point_search)
             set(Hs,'String','Copy: select an object to Copy');
         end
@@ -1679,9 +1754,6 @@ end
     function image_fun(varargin)
         % Buttons in the image panel
         
-        % clear some globals
-        reset_globals;
-        
         type = varargin{3};
         if strcmpi(type,'select')
             % called upon events in the image listbox
@@ -1931,6 +2003,7 @@ end
         
         % clear the temporary measurement (if any)
         reset_globals;
+
         if ishandle(Htmp)
             delete(Htmp);
         end
@@ -2853,67 +2926,6 @@ end
         % shorthand to get only the filename from a path
         [~,name,ext] = fileparts(filename);
         filename = [name, ext];
-    end
-
-% Keyboard Mouse
-% ===========================================================
-    function keyPressFcn(varargin)
-        % keyboard presses
-        evnt = varargin{2};
-        if strcmpi(evnt.Key,'escape')
-            % panic button, reset the gui to some sane state
-            measure_fun([],[],'null')
-            userxlim = [1 imsize(2)];
-            userylim = [1 imsize(1)];
-            set(Ha,'XLim',userxlim);
-            set(Ha,'YLim',userylim);
-            % cancel calibration
-            if ishandle(Hcal)
-                delete(Hcal)
-            end
-        elseif strcmpi(evnt.Key,'space')
-            measure_fun([],[],'Copy')
-        elseif strcmpi(evnt.Key,'d')
-            measure_fun([],[],'Distance')
-        elseif strcmpi(evnt.Key,'p')
-            measure_fun([],[],'Polyline')
-        elseif strcmpi(evnt.Key,'o')
-            measure_fun([],[],'Circle')
-        elseif strcmpi(evnt.Key,'c')
-            measure_fun([],[],'Caliper')
-        elseif strcmpi(evnt.Key,'s')
-            measure_fun([],[],'Spline')
-        elseif strcmpi(evnt.Key,'a')
-            measure_fun([],[],'Angle')
-        elseif strcmpi(evnt.Key,'e')
-            measure_fun([],[],'Edit')
-        elseif strcmpi(evnt.Key,'z')
-            ZoomSelect = ~ZoomSelect;
-            set(Hb.zoomselect,'Value',ZoomSelect);
-            if ZoomSelect
-                Hs.String = 'Zoom Select is activated';
-            else
-                Hs.String = 'Zoom Select is deactivated';
-                if zoom_flag
-                    zoom_flag = false;
-                    set(Ha,'XLim',userxlim,'YLim',userylim);
-                end
-            end
-        elseif strcmpi(evnt.Key,'Delete')
-            measure_fun([],[],'delete')
-        elseif strcmpi(evnt.Key,'backspace')
-            measure_fun([],[],'Delete')
-        elseif strcmpi(evnt.Key,'control')
-            drag_moveall = true;
-        end
-    end
-
-    function keyReleaseFcn(varargin)
-        % when releasing a key
-        evnt = varargin{2};
-        if strcmpi(evnt.Key,'control')
-            drag_moveall = false;
-        end
     end
 
 % =====================================================
