@@ -16,8 +16,6 @@ The GUI is reasonably self contained, all code resides in one file: measuretool.
 This file also contains the GUI help, which is available through the GUI itself. See the header of measuretool.m for more info.
 
 The tool has been hosted on the Matlab FileExchange since November 2009, the corresponding website can be found here:
-http://www.mathworks.com/matlabcentral/fileexchange/25964-image-measurement-utility
+http://www.mathworks.com/matlabcentral/fileexchange/25964-image-measurement-utility. Recently, that site is linked to the GitHub repository, which can be found here: https://github.com/Jann5s/measuretool.
 
-The current version (2.00) is not yet uploaded to the file exchange, since it is
-currently in BETA state, and requires testing before it can be uploaded. Please let me know if you find any bugs or issues, or if you have some nice ideas for improvement.
-
+Please let me know (by submitting and issue on GitHub) if you find any bugs or issues, or if you have some nice ideas for improvement.
