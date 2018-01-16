@@ -8,7 +8,7 @@ function varargout = measuretool(varargin)
 % A = measuretool(A), alternatively preload the tool with a previously
 % generated data structure containing image paths and measurements
 %
-% Version 2.00 (beta), 2017, Jan Neggers
+% Version 2.01, 2018, Jan Neggers
 %
 % This tool is available on the Mathworks FileExchange under the
 % corresponding BSD license.
@@ -1565,10 +1565,10 @@ end
                 
                 % apply the calibration
                 r = hypot(diff(click_data(1:2,1)),diff(click_data(1:2,2)));
-                A(i).obj(j).val = r;
                 length = calib_length;
                 unit = unit_str{unit_val};
                 pixelsize = [length./r, length, r];
+                A(i).obj(j).val_px = r;
                 for k = combined
                     A(k).cal = i;
                     A(k).pixelsize = pixelsize;
@@ -1632,7 +1632,7 @@ end
             a = (180/pi)*atan2(diff(y),diff(x));
             a = textangle(a);
             r = hypot(diff(x),diff(y));
-            A(i).obj(j).val = r;
+            A(i).obj(j).val_px = r;
             str = sprintf([NumberFormat ' px'],r);
             set(hdl(1:4),'XData',x,'YData',y);
             set(hdl(5),'Position',[mean(x), mean(y), 0],'Rotation',-a,'String',str);
@@ -1662,7 +1662,7 @@ end
             a = (180/pi)*atan2(diff(y),diff(x));
             a = textangle(a);
             r = hypot(diff(x),diff(y));
-            A(i).obj(j).val = r;
+            A(i).obj(j).val_px = r;
             str = sprintf([NumberFormat ' %s'],r.*pixelsize(1),unit);
             set(hdl(1:4),'XData',x,'YData',y);
             set(hdl(5),'Position',[mean(x), mean(y), 0],'Rotation',-a,'String',str);
@@ -1670,7 +1670,7 @@ end
             a = (180/pi)*atan2(diff(y),diff(x));
             r = hypot(diff(x),diff(y));
             a = textangle(a);
-            A(i).obj(j).val = r;
+            A(i).obj(j).val_px = r;
             theta = linspace(0,2*pi,Npoints);
             xc = x(1) + r.*cos(theta(:));
             yc = y(1) + r.*sin(theta(:));
@@ -1682,8 +1682,8 @@ end
             [x, y, D] = Caliper(x,y);
             a = (180/pi)*atan2(y(4)-y(3),x(4)-x(3));
             a = textangle(a);
-            A(i).obj(j).val = abs(D);
-            str = sprintf([NumberFormat ' %s'],A(i).obj(j).val*pixelsize(1),unit);
+            A(i).obj(j).val_px = abs(D);
+            str = sprintf([NumberFormat ' %s'],A(i).obj(j).val_px*pixelsize(1),unit);
             set(hdl(1:4),'XData',[x(1);x(2);NaN;x(3);x(4)],'YData',[y(1);y(2);NaN;y(3);y(4)]);
             set(hdl(5),'Position',[mean(x(3:4)), mean(y(3:4)), 0],'Rotation',-a,'String',str);
         elseif strcmpi(type,'Angle')
@@ -1696,7 +1696,7 @@ end
                 da = da + 2*pi;
             end
             a2 = a1 + da;
-            A(i).obj(j).val = abs(da);
+            A(i).obj(j).val_px = abs(da);
             r1 = hypot(x(1)-x(2),y(1)-y(2));
             r2 = hypot(x(3)-x(2),y(3)-y(2));
             r = min(r1,r2);
@@ -1724,7 +1724,7 @@ end
                 ya = y;
                 str = '';
             end
-            A(i).obj(j).val = r ;
+            A(i).obj(j).val_px = r ;
             set(hdl(1:4),'XData',x,'YData',y);
             set(hdl(5),'Position',[xa, ya, 0],'Rotation',-a,'String',str);
         elseif strcmpi(type,'Spline')
@@ -1742,7 +1742,7 @@ end
             a = (180/pi)*atan2(diff(yc(Ip)),diff(xc(Ip)));
             a = textangle(a);
             r = sum(hypot(diff(x),diff(y)));
-            A(i).obj(j).val = r ;
+            A(i).obj(j).val_px = r ;
             str = sprintf([NumberFormat ' %s'],r.*pixelsize(1),unit);
             set(hdl(1:2),'XData',x,'YData',y);
             set(hdl(3:4),'XData',xc,'YData',yc);
@@ -2207,7 +2207,7 @@ end
                 fname = basename(A(i).filename);
                 for j = 1:Nm(i)
                     type = A(i).obj(j).type;
-                    val = A(i).obj(j).val;
+                    val = A(i).obj(j).val_px;
                     fprintf(fid,'%3d, %3d, %11s, %13.6e, %5s, %s \r\n',i,j,type,val,unit,fname);
                 end
             end
@@ -2239,7 +2239,7 @@ end
                 unit = unit_lst{ismember(unit_str,A(i).unit)};
                 for j = 1:Nm(i)
                     type = A(i).obj(j).type;
-                    val = A(i).obj(j).val;
+                    val = A(i).obj(j).val_px;
                     fprintf(fid,'Measurement %d: %s, %13.6e %s \r\n',j,type,val,unit);
                     x = A(i).obj(j).points(:,1);
                     y = A(i).obj(j).points(:,2);
@@ -2733,7 +2733,7 @@ end
         for k = 1:numel(obj)
             type = obj(k).type;
             hdl = obj(k).hdl;
-            val = obj(k).val;
+            val = obj(k).val_px;
             if isempty(hdl)
                 continue
             end
@@ -2900,17 +2900,25 @@ end
         
         % populate image intensities
         get_intensities;
-        
-        % copy the data
-        B = A;
+
         if ~isfield(A,'obj')
             return
         end
         
-        % remove plot handles from the data
+        % copy the data
+        B = A;
+        
         for i = 1:numel(A)
-            if ~isempty(A(i).obj)
-                B(i).obj = rmfield(A(i).obj,'hdl');
+            % pre-multiply the units
+            for j = 1:numel(A(i).obj)
+                if isfield(A(i).obj(j),'val_px');
+                    B(i).obj(j).val_unit = B(i).obj(j).val_px * B(i).pixelsize(1);
+                end
+            end
+            
+            % remove plot handles from the data
+            if ~isempty(B(i).obj)
+                B(i).obj = orderfields(rmfield(B(i).obj,'hdl'));
             end
         end
     end
@@ -3065,12 +3073,13 @@ end
             ' A(i).unit        : string indicating the units specified during calibration'
             ' A(i).obj         : a structure array with one element per measurement with the following fields'
             ' obj(j).type      : the type of measurement (Distance, Angle, etc.)'
-            ' obj(j).val       : the measurement value in pixels'
+            ' obj(j).val_px    : the measurement value in pixels'
+            ' obj(j).val_unit  : the measurement value in the specified units'
             ' obj(j).points    : the vertices of the measurement as a Nx2 matrix in pixels'
             ' obj(j).intensity : the image intensity at the vertex locations'
             '                    Nx1 matrix for grayscale'
             '                    Nx3 matrix for RGB'
-            'Multiply the values in obj(j).val and obj(j).points by pixelsize(1) to apply the calibration and convert them to real units.'
+            'Multiply the values in obj(j).val_px and obj(j).points by pixelsize(1) to apply the calibration and convert them to real units.'
             ''
             'Exiting the tool'
             '============================='
@@ -3078,6 +3087,10 @@ end
             ''
             'Changelog'
             '============================='
+            'version 2.01 by Jan Neggers, Jan,2018'
+            '   - changed the output structure to have both val_px and val_units to address some comments of '
+            '     users expecting the obj.val output to be in the specified units.'
+            ''
             'version 2.00 by Jan Neggers, Oct,2017'
             '   - Complete rewrite, optimized for more recent matlab versions'
             '   - New mouse interaction system, removing the IP toolbox requirement'
