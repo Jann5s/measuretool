@@ -554,6 +554,14 @@ uicontrol('String','Save to PDF',...
     'Position',[x0(2),y0(2),dx,dy],...
     'Parent',Hp(5),...
     'call',{@save_fun,'SavePDF'});
+uicontrol('String','Save to WS',...
+    'ToolTipString','save the datastructure to the workspace',...
+    'Style','pushbutton',...
+    'Units','normalized',...
+    'FontSize',fontsize(2),...
+    'Position',[x0(3),y0(3),dx,dy],...
+    'Parent',Hp(5),...
+    'call',{@save_fun,'SaveWS'});
 uicontrol('String','Save to Text',...
     'ToolTipString','write all data to a formatted text file',...
     'Style','pushbutton',...
@@ -652,6 +660,16 @@ Hb.markersize = uicontrol('String',num2str(MarkerSize),...
     'FontSize',fontsize(2),...
     'Position',[x0(2),y0(row),dx,dy],...
     'call',@options_fun,...
+    'Parent',Hp(6));
+row = row + 1;
+Hb.updateexisting = uicontrol('String','Update the existing',...
+    'ToolTipString','update the colors of all drawn objects, disable this to only update new measurements',...
+    'Style','checkbox',...
+    'Value',true,...
+    'HorizontalAlignment','left',...
+    'Units','normalized',...
+    'FontSize',fontsize(2),...
+    'Position',[x0(1),y0(row),x0(3)-x0(1),dy],...
     'Parent',Hp(6));
 
 row = row + 2;
@@ -1821,7 +1839,9 @@ end
                     if ~isfield(A,'obj')
                         continue
                     end
-                    delete(A(k).obj(:).hdl);
+                    if isfield(A(k).obj,'hdl')
+                        delete(A(k).obj(:).hdl);
+                    end
                 end
                 Nim = numel(A);
                 notselected = setdiff(1:Nim,selected);
@@ -2163,6 +2183,18 @@ end
             structload_fun(B);
             
             set(Hs,'string',sprintf('%s loaded',filename));
+        elseif strcmpi(type,'SaveWS')
+            % prompt for a variable to save as
+            savevarname = inputdlg('Define a variable name','Save to workspace');
+            if isempty(savevarname)
+                set(Hs,'string','Save workspace aborted.');
+                return
+            end
+            savevarname = matlab.lang.makeValidName(savevarname);
+            savevarname = savevarname{1};
+            mt_data = output_fun;
+            assignin('base',savevarname,mt_data);
+            set(Hs,'string',sprintf('%s saved',savevarname));
         elseif strcmpi(type,'SaveText')
             % save to a .txt
             if isempty(A) || ~isfield(A,'filename')
@@ -2358,27 +2390,33 @@ end
         Hb.MaxPolyline.String = sprintf('%d',MaxPolyline);
         
         % update the figures
-        Hp1 = findobj(Ha,'tag','measuretool_p1_markers');
-        Hp2 = findobj(Ha,'tag','measuretool_p2_markers');
-        Hp3 = findobj(Ha,'tag','measuretool_p1_nomarkers');
-        Hp4 = findobj(Ha,'tag','measuretool_p2_nomarkers');
-        Hp5 = findobj(Ha,'tag','measuretool_text');
-        if ~isempty(Hp1)
-            set(Hp1,'Color',color.val(PlotColors(2),:),'Marker',markers{PlotMarkers(2)},'MarkerSize',MarkerSize,'LineWidth',LineWidth(2));
-        end
-        if ~isempty(Hp2)
-            set(Hp2,'Color',color.val(PlotColors(1),:),'Marker',markers{PlotMarkers(1)},'MarkerSize',MarkerSize,'LineWidth',LineWidth(1));
-        end
-        if ~isempty(Hp3)
-            set(Hp3,'Color',color.val(PlotColors(2),:),'Marker','none','MarkerSize',MarkerSize,'LineWidth',LineWidth(2));
-        end
-        if ~isempty(Hp4)
-            set(Hp4,'Color',color.val(PlotColors(1),:),'Marker','none','MarkerSize',MarkerSize,'LineWidth',LineWidth(1));
-        end
-        if ~isempty(Hp5)
-            set(Hp5,'Color',color.val(PlotColors(1),:),'FontSize',fontsize(3),'BackgroundColor',[color.val(PlotColors(2),:),TextBoxAlpha]);
+        if Hb.updateexisting.Value
+            Hp1 = findobj(Ha,'tag','measuretool_p1_markers');
+            Hp2 = findobj(Ha,'tag','measuretool_p2_markers');
+            Hp3 = findobj(Ha,'tag','measuretool_p1_nomarkers');
+            Hp4 = findobj(Ha,'tag','measuretool_p2_nomarkers');
+            Hp5 = findobj(Ha,'tag','measuretool_text');
+            if ~isempty(Hp1)
+                set(Hp1,'Color',color.val(PlotColors(2),:),'Marker',markers{PlotMarkers(2)},'MarkerSize',MarkerSize,'LineWidth',LineWidth(2));
+            end
+            if ~isempty(Hp2)
+                set(Hp2,'Color',color.val(PlotColors(1),:),'Marker',markers{PlotMarkers(1)},'MarkerSize',MarkerSize,'LineWidth',LineWidth(1));
+            end
+            if ~isempty(Hp3)
+                set(Hp3,'Color',color.val(PlotColors(2),:),'Marker','none','MarkerSize',MarkerSize,'LineWidth',LineWidth(2));
+            end
+            if ~isempty(Hp4)
+                set(Hp4,'Color',color.val(PlotColors(1),:),'Marker','none','MarkerSize',MarkerSize,'LineWidth',LineWidth(1));
+            end
+            if ~isempty(Hp5)
+                set(Hp5,'Color',color.val(PlotColors(1),:),'FontSize',fontsize(3),'BackgroundColor',[color.val(PlotColors(2),:),TextBoxAlpha]);
+            end
+        else
+            % disable any active measurement
+            measure_fun([],[],'null')            
         end
         set(Hdrag,'MarkerSize',MarkerSize+4);
+        
         
         % set visibility state of objects
         for i = 1:numel(A)
@@ -2911,7 +2949,11 @@ end
         for i = 1:numel(A)
             % pre-multiply the units
             for j = 1:numel(A(i).obj)
-                if isfield(A(i).obj(j),'val_px');
+                if isempty(A(i).pixelsize)
+                    B(i).pixelsize = [1, 1, 1];
+                    B(i).unit = 'px';
+                end
+                if ~isempty(A(i).obj) && isfield(A(i).obj(j),'val_px');
                     B(i).obj(j).val_unit = B(i).obj(j).val_px * B(i).pixelsize(1);
                 end
             end
