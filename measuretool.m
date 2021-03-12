@@ -8,7 +8,7 @@ function varargout = measuretool(varargin)
 % A = measuretool(A), alternatively preload the tool with a previously
 % generated data structure containing image paths and measurements
 %
-% Version 2.01, 2018, Jan Neggers
+% Version 2.02, 2021, Jan Neggers
 %
 % This tool is available on the Mathworks FileExchange under the
 % corresponding BSD license.
@@ -3070,6 +3070,7 @@ end
             '<Save to PNG>: Save the current figure window as a .png file'
             '<Save to PDF>: Save the current figure window as a .pdf file'
             '<Save to Text>: Write all the measurement data to a formatted text file. The text file contains two sections, the first is a table with one row per measurement. The second part of the file contains the raw data of each measurement including coordinates of all points used in the measurement and the gray-values (or RGB values) for each point. The data in this section is in pixels and can be converted to the proper units using the calibration data written in the same section.'
+            '<Save to WS>: Save the data structure to the workspace. A popup is presented to choose the variable name before saving.'
             ''
             'Options'
             '============================='
@@ -3129,6 +3130,10 @@ end
             ''
             'Changelog'
             '============================='
+            'version 2.02 by Jan Neggers, Mar,2021'
+            '   - fix a bug that blocked saving when no calibration was performed (thanks to Robert)'
+            '   - added a new option that allows not changing the colors of existing objects (thanks to Adam Lowery)'
+            ''
             'version 2.01 by Jan Neggers, Jan,2018'
             '   - changed the output structure to have both val_px and val_units to address some comments of '
             '     users expecting the obj.val output to be in the specified units.'
